@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
-import connectDB from '@/lib/mongodb';
-import Booking from '@/models/Booking';
+import dbConnect from '@/lib/mongodb';
 import { auth } from '@/auth';
 
-// GET - Fetch single booking
 export async function GET(request, { params }) {
   try {
-    const session = await auth();
+    // Connect to database FIRST
+    await dbConnect();
 
+    // Import models AFTER connection
+    const Booking = (await import('@/models/Booking')).default;
+    
+    const session = await auth();
+    
     if (!session) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -15,10 +19,10 @@ export async function GET(request, { params }) {
       );
     }
 
-    await connectDB();
-    const booking = await Booking.findById(params.id)
-      .populate('car')
-      .populate('user', 'name email');
+    const bookingId = params.id;
+
+    // Populate car details with the booking
+    const booking = await Booking.findById(bookingId).populate('car');
 
     if (!booking) {
       return NextResponse.json(
@@ -27,109 +31,40 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Check if user owns this booking or is admin
-    if (booking.user._id.toString() !== session.user.id && session.user.role !== 'admin') {
+    // Check if booking belongs to the user
+    if (booking.user.toString() !== session.user.id) {
       return NextResponse.json(
-        { success: false, error: 'Forbidden' },
+        { success: false, error: 'Unauthorized access' },
         { status: 403 }
       );
     }
 
-    return NextResponse.json({ success: true, booking }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      booking: {
+        _id: booking._id,
+        car: {
+          _id: booking.car._id,
+          name: booking.car.name,
+          brand: booking.car.brand,
+          model: booking.car.model,
+          images: booking.car.images,
+          pricePerDay: booking.car.pricePerDay,
+        },
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        totalDays: booking.totalDays,
+        totalPrice: booking.totalPrice,
+        pickupLocation: booking.pickupLocation,
+        dropoffLocation: booking.dropoffLocation,
+        paymentStatus: booking.paymentStatus,
+        status: booking.status,
+      },
+    });
   } catch (error) {
+    console.error('Error fetching booking:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// PUT - Update booking status
-export async function PUT(request, { params }) {
-  try {
-    const session = await auth();
-
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    await connectDB();
-    const body = await request.json();
-    const booking = await Booking.findById(params.id);
-
-    if (!booking) {
-      return NextResponse.json(
-        { success: false, error: 'Booking not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check permissions
-    if (booking.user.toString() !== session.user.id && session.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
-
-    const updatedBooking = await Booking.findByIdAndUpdate(
-      params.id,
-      body,
-      { new: true }
-    ).populate('car');
-
-    return NextResponse.json({ success: true, booking: updatedBooking }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE - Cancel booking
-export async function DELETE(request, { params }) {
-  try {
-    const session = await auth();
-
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    await connectDB();
-    const booking = await Booking.findById(params.id);
-
-    if (!booking) {
-      return NextResponse.json(
-        { success: false, error: 'Booking not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check permissions
-    if (booking.user.toString() !== session.user.id && session.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
-
-    booking.status = 'cancelled';
-    await booking.save();
-
-    return NextResponse.json(
-      { success: true, message: 'Booking cancelled successfully' },
-      { status: 200 }
-    );
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: 'Server error' },
       { status: 500 }
     );
   }

@@ -27,18 +27,23 @@ const BookingSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  pickupLocation: {
+    type: String,
+    required: true,
+  },
+  dropoffLocation: {
+    type: String,
+    required: true,
+  },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+    enum: ['pending', 'confirmed', 'active', 'completed', 'cancelled'],
     default: 'pending',
   },
   paymentStatus: {
     type: String,
     enum: ['pending', 'paid', 'failed', 'refunded'],
     default: 'pending',
-  },
-  paymentId: {
-    type: String,
   },
   razorpayOrderId: {
     type: String,
@@ -49,24 +54,12 @@ const BookingSchema = new mongoose.Schema({
   razorpaySignature: {
     type: String,
   },
-  pickupLocation: {
-    type: String,
-    required: true,
-  },
-  dropoffLocation: {
-    type: String,
-    required: true,
-  },
-  driverLicense: {
-    type: String,
-  },
-  additionalNotes: {
-    type: String,
-  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
 
-export default mongoose.models.Booking || mongoose.model('Booking', BookingSchema);
+const Booking = mongoose.models?.Booking || mongoose.model('Booking', BookingSchema);
+
+export default Booking;

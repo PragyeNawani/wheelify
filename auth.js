@@ -1,80 +1,104 @@
-import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
-import connectDB from "./lib/mongodb";
-import User from "./models/User";
+import NextAuth from 'next-auth';
+import Google from 'next-auth/providers/google';
+import Credentials from 'next-auth/providers/credentials';
+import dbConnect from '@/lib/mongodb';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
+    Credentials({
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
+      async authorize(credentials) {
+        try {
+          // Connect to DB first
+          await dbConnect();
+          
+          // Dynamically import User model AFTER connection
+          const User = (await import('@/models/User')).default;
+          
+          const user = await User.findOne({ email: credentials.email });
+          
+          if (!user) {
+            throw new Error('No user found with this email');
+          }
+
+          // Add your password verification here if needed
+          // const bcrypt = require('bcryptjs');
+          // const isValid = await bcrypt.compare(credentials.password, user.password);
+          // if (!isValid) throw new Error('Invalid password');
+
+          return {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            role: user.role,
+          };
+        } catch (error) {
+          console.error('Auth error:', error);
+          return null;
+        }
+      }
+    })
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      console.log('SignIn Callback - User:', user.email);
-      await connectDB();
-      
-      try {
-        let existingUser = await User.findOne({ email: user.email });
-        
-        if (!existingUser) {
-          existingUser = await User.create({
-            name: user.name,
-            email: user.email,
-            image: user.image,
-            emailVerified: new Date(),
-          });
-          console.log('Created new user with ID:', existingUser._id.toString());
-        } else {
-          console.log('Found existing user with ID:', existingUser._id.toString());
+      if (account?.provider === 'google') {
+        try {
+          await dbConnect();
+          
+          // Dynamically import User model
+          const User = (await import('@/models/User')).default;
+          
+          const existingUser = await User.findOne({ email: user.email });
+          
+          if (!existingUser) {
+            await User.create({
+              name: user.name,
+              email: user.email,
+              image: user.image,
+              emailVerified: new Date(),
+            });
+          }
+          
+          return true;
+        } catch (error) {
+          console.error('Sign in error:', error);
+          return false;
         }
-        
-        // Store the MongoDB _id in the user object
-        user.mongoId = existingUser._id.toString();
-        user.role = existingUser.role;
-        
-        return true;
-      } catch (error) {
-        console.error("Error during sign in:", error);
-        return false;
       }
+      return true;
     },
     async jwt({ token, user, account }) {
-      console.log('JWT Callback triggered');
-      console.log('Has account?', !!account);
-      console.log('Has user?', !!user);
-      
-      // Initial sign in
       if (user) {
-        console.log('Adding user data to token');
-        // If we stored mongoId in signIn callback
-        if (user.mongoId) {
-          token.id = user.mongoId;
-          token.role = user.role || 'user';
-        } else {
-          // Fallback: fetch from database
-          await connectDB();
+        try {
+          await dbConnect();
+          
+          // Dynamically import User model
+          const User = (await import('@/models/User')).default;
+          
           const dbUser = await User.findOne({ email: user.email });
           if (dbUser) {
             token.id = dbUser._id.toString();
-            token.role = dbUser.role || 'user';
+            token.role = dbUser.role;
           }
+        } catch (error) {
+          console.error('JWT callback error:', error);
         }
       }
-      
-      console.log('Token ID:', token.id);
       return token;
     },
     async session({ session, token }) {
-      console.log('Session Callback - Token ID:', token.id);
-      
-      if (session?.user) {
+      if (token && session.user) {
         session.user.id = token.id;
-        session.user.role = token.role || 'user';
+        session.user.role = token.role;
       }
-      
-      console.log('Final session user ID:', session?.user?.id);
       return session;
     },
   },
@@ -82,7 +106,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: '/auth/signin',
   },
   session: {
-    strategy: "jwt",
+    strategy: 'jwt',
   },
-  debug: true, // Enable debug mode
+  secret: process.env.NEXTAUTH_SECRET,
 });

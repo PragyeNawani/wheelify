@@ -79,4 +79,7 @@ const CarSchema = new mongoose.Schema({
   },
 });
 
-export default mongoose.models.Car || mongoose.model('Car', CarSchema);
+// Change this line - add optional chaining
+const Car = mongoose.models?.Car || mongoose.model('Car', CarSchema);
+
+export default Car;

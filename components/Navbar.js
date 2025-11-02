@@ -2,10 +2,16 @@
 
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { signIn, signOut } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function Navbar() {
   const { data: session, status } = useSession();
+  const router = useRouter();
+
+  const handleSignIn = () => {
+    router.push('/auth/signin');
+  };
 
   return (
     <nav className="bg-white shadow-lg">
@@ -58,7 +64,7 @@ export default function Navbar() {
               </>
             ) : (
               <button
-                onClick={() => signIn('google')}
+                onClick={handleSignIn}
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
               >
                 Sign In

@@ -1,7 +1,9 @@
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
 import dbConnect from '@/lib/mongodb';
+import User from '@/models/User';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -16,32 +18,47 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         try {
-          // Connect to DB first
-          await dbConnect();
+          console.log('🔐 Authorize attempt for:', credentials?.email);
           
-          // Dynamically import User model AFTER connection
-          const User = (await import('@/models/User')).default;
-          
-          const user = await User.findOne({ email: credentials.email });
-          
-          if (!user) {
-            throw new Error('No user found with this email');
+          if (!credentials?.email || !credentials?.password) {
+            console.log('❌ Missing credentials');
+            return null;
           }
 
-          // Add your password verification here if needed
-          // const bcrypt = require('bcryptjs');
-          // const isValid = await bcrypt.compare(credentials.password, user.password);
-          // if (!isValid) throw new Error('Invalid password');
+          await dbConnect();
+          console.log('✅ Database connected');
+          
+          const user = await User.findOne({ email: credentials.email.toLowerCase() });
+          console.log('👤 User found:', !!user);
+          
+          if (!user) {
+            console.log('❌ No user found');
+            return null;
+          }
 
+          if (!user.password) {
+            console.log('❌ User has no password (Google user)');
+            return null;
+          }
+
+          const isValid = await bcrypt.compare(credentials.password, user.password);
+          console.log('🔑 Password valid:', isValid);
+          
+          if (!isValid) {
+            console.log('❌ Invalid password');
+            return null;
+          }
+
+          console.log('✅ Authorization successful');
           return {
             id: user._id.toString(),
             email: user.email,
             name: user.name,
             image: user.image,
-            role: user.role,
+            role: user.role || 'user',
           };
         } catch (error) {
-          console.error('Auth error:', error);
+          console.error('❌ Auth error:', error);
           return null;
         }
       }
@@ -49,48 +66,48 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (account?.provider === 'google') {
-        try {
+      try {
+        console.log('🔄 SignIn callback - Provider:', account?.provider);
+        
+        if (account?.provider === 'google') {
           await dbConnect();
-          
-          // Dynamically import User model
-          const User = (await import('@/models/User')).default;
+          console.log('✅ Database connected for Google signin');
           
           const existingUser = await User.findOne({ email: user.email });
+          console.log('👤 Existing Google user:', !!existingUser);
           
           if (!existingUser) {
+            console.log('➕ Creating new Google user');
             await User.create({
               name: user.name,
               email: user.email,
               image: user.image,
+              googleId: profile?.sub,
               emailVerified: new Date(),
             });
+            console.log('✅ Google user created');
+          } else if (!existingUser.googleId) {
+            console.log('🔗 Linking Google account to existing user');
+            existingUser.googleId = profile?.sub;
+            existingUser.image = user.image;
+            existingUser.emailVerified = new Date();
+            await existingUser.save();
+            console.log('✅ Google account linked');
           }
-          
-          return true;
-        } catch (error) {
-          console.error('Sign in error:', error);
-          return false;
         }
+        
+        console.log('✅ SignIn callback successful');
+        return true;
+      } catch (error) {
+        console.error('❌ Sign in error:', error);
+        return false;
       }
-      return true;
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
-        try {
-          await dbConnect();
-          
-          // Dynamically import User model
-          const User = (await import('@/models/User')).default;
-          
-          const dbUser = await User.findOne({ email: user.email });
-          if (dbUser) {
-            token.id = dbUser._id.toString();
-            token.role = dbUser.role;
-          }
-        } catch (error) {
-          console.error('JWT callback error:', error);
-        }
+        token.id = user.id;
+        token.role = user.role || 'user';
+        console.log('✅ JWT token created for user:', user.email);
       }
       return token;
     },
@@ -98,15 +115,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token && session.user) {
         session.user.id = token.id;
         session.user.role = token.role;
+        console.log('✅ Session created for user:', session.user.email);
       }
       return session;
     },
   },
   pages: {
     signIn: '/auth/signin',
+    error: '/auth/error',
   },
   session: {
     strategy: 'jwt',
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: true,
 });

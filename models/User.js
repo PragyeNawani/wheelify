@@ -9,6 +9,19 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
+    lowercase: true,
+  },
+  password: {
+    type: String,
+    required: function() {
+      // Password is required only if user doesn't have a googleId
+      return !this.googleId;
+    },
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true, // Allows multiple null values
   },
   image: {
     type: String,

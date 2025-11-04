@@ -77,6 +77,11 @@ const CarSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  assignedDriver: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Driver',
+    default: null
+  }
 });
 
 // Change this line - add optional chaining

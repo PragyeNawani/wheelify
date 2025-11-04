@@ -30,7 +30,12 @@ export default function Navbar() {
             >
               Browse Cars
             </Link>
-
+            <Link
+              href="/drivers"
+              className="text-gray-700 hover:text-blue-600 transition"
+            >
+              Drivers
+            </Link>
             {status === 'authenticated' ? (
               <>
                 <Link

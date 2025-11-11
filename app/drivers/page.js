@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function DriversPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('available');
@@ -32,22 +36,29 @@ export default function DriversPage() {
     document.body.appendChild(script);
   }, []);
 
+  useEffect(() => {
+    // Pre-fill customer details if user is logged in
+    if (session?.user) {
+      setHireFormData(prev => ({
+        ...prev,
+        customerName: session.user.name || '',
+        customerEmail: session.user.email || '',
+      }));
+    }
+  }, [session]);
+
   const fetchDrivers = async () => {
     try {
       setLoading(true);
       const queryParam = filter === 'available' ? '?available=true' : 
                         filter !== 'all' ? `?status=${filter}` : '';
       
-      console.log('Fetching from:', `/api/drivers${queryParam}`);
       const response = await fetch(`/api/drivers${queryParam}`);
-      console.log('Response status:', response.status);
       
       const data = await response.json();
-      console.log('Response data:', data);
       
       if (data.success) {
         setDrivers(data.data);
-        console.log('Drivers loaded:', data.data.length);
       } else {
         console.error('API returned error:', data.error);
         alert('Error: ' + (data.error || 'Failed to fetch drivers'));
@@ -61,6 +72,10 @@ export default function DriversPage() {
   };
 
   const handleHireClick = (driver) => {
+    if (status === 'unauthenticated') {
+      router.push('/api/auth/signin');
+      return;
+    }
     setSelectedDriver(driver);
     setShowHireModal(true);
   };
@@ -105,8 +120,14 @@ export default function DriversPage() {
     try {
       const totalAmount = calculateTotalAmount();
       
+      console.log('Creating payment order...', {
+        amount: totalAmount,
+        driverId: selectedDriver._id,
+        hireDetails: hireFormData
+      });
+      
       // Create order on backend
-      const orderResponse = await fetch('/api/payment/create-order', {
+      const orderResponse = await fetch('/api/payment/driver/create-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,10 +139,24 @@ export default function DriversPage() {
         }),
       });
       
+      console.log('Order response status:', orderResponse.status);
+      
+      if (!orderResponse.ok) {
+        const errorText = await orderResponse.text();
+        console.error('Order response error:', errorText);
+        throw new Error(`HTTP error! status: ${orderResponse.status}`);
+      }
+      
       const orderData = await orderResponse.json();
+      console.log('Order data received:', orderData);
       
       if (!orderData.success) {
-        throw new Error(orderData.error || 'Failed to create order');
+        throw new Error(orderData.error || orderData.details || 'Failed to create order');
+      }
+
+      // Check if Razorpay is loaded
+      if (typeof window.Razorpay === 'undefined') {
+        throw new Error('Razorpay SDK not loaded. Please refresh the page.');
       }
       
       // Initialize Razorpay
@@ -133,30 +168,41 @@ export default function DriversPage() {
         description: `Hire ${selectedDriver.name} for ${hireFormData.duration} ${hireFormData.durationType}`,
         order_id: orderData.orderId,
         handler: async function (response) {
-          // Verify payment on backend
-          const verifyResponse = await fetch('/api/payment/verify', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              driverId: selectedDriver._id,
-              hireDetails: hireFormData
-            }),
-          });
-          
-          const verifyData = await verifyResponse.json();
-          
-          if (verifyData.success) {
-            alert('Payment successful! Driver hired successfully!');
-            setShowHireModal(false);
-            fetchDrivers();
-            resetHireForm();
-          } else {
-            alert('Payment verification failed: ' + verifyData.error);
+          try {
+            console.log('Payment successful, verifying...');
+            // Verify payment on backend
+            const verifyResponse = await fetch('/api/payment/driver/verify', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                driverId: selectedDriver._id,
+                hireDetails: hireFormData
+              }),
+            });
+            
+            const verifyData = await verifyResponse.json();
+            console.log('Verification response:', verifyData);
+            
+            if (verifyData.success) {
+              alert('Payment successful! Driver hired successfully!');
+              setShowHireModal(false);
+              fetchDrivers();
+              resetHireForm();
+              // Redirect to bookings page
+              router.push('/bookings');
+            } else {
+              alert('Payment verification failed: ' + (verifyData.error || verifyData.details || 'Unknown error'));
+            }
+          } catch (verifyError) {
+            console.error('Verification error:', verifyError);
+            alert('Payment verification failed: ' + verifyError.message);
+          } finally {
+            setProcessingPayment(false);
           }
         },
         prefill: {
@@ -176,6 +222,7 @@ export default function DriversPage() {
       
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (response) {
+        console.error('Payment failed:', response.error);
         alert('Payment failed: ' + response.error.description);
         setProcessingPayment(false);
       });
@@ -195,8 +242,8 @@ export default function DriversPage() {
       durationType: 'days',
       carId: '',
       specialRequirements: '',
-      customerName: '',
-      customerEmail: '',
+      customerName: session?.user?.name || '',
+      customerEmail: session?.user?.email || '',
       customerPhone: ''
     });
     setSelectedDriver(null);

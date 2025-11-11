@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
-import connectDB from '@/lib/mongodb';
+import dbConnect from '@/lib/mongodb';
 import { auth } from '@/auth';
 
 export async function POST(request) {
   try {
-    console.log('=== Car Payment Order Creation Started ===');
+    console.log('=== Driver Payment Order Creation Started ===');
     
     // Check environment variables
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -13,16 +13,6 @@ export async function POST(request) {
       return NextResponse.json(
         { success: false, error: 'Payment gateway not configured' },
         { status: 500 }
-      );
-    }
-
-    await connectDB();
-    
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
       );
     }
 
@@ -39,9 +29,9 @@ export async function POST(request) {
     const body = await request.json();
     console.log('Body received:', JSON.stringify(body, null, 2));
 
-    const { amount, carId, userId, bookingDetails } = body;
+    const { amount, driverId, hireDetails } = body;
 
-    if (!amount || !carId || !userId || !bookingDetails) {
+    if (!amount || !driverId || !hireDetails) {
       console.error('Missing required fields');
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
@@ -62,10 +52,10 @@ export async function POST(request) {
     }
 
     // Create a shorter receipt ID (max 40 characters)
-    // Format: CAR_<last8CharsOfCarId>_<timestamp>
-    const carIdShort = carId.slice(-8); // Last 8 characters of car ID
+    // Format: DRV_<last8CharsOfDriverId>_<timestamp>
+    const driverIdShort = driverId.slice(-8); // Last 8 characters of driver ID
     const timestamp = Date.now().toString().slice(-10); // Last 10 digits of timestamp
-    const receipt = `CAR_${carIdShort}_${timestamp}`;
+    const receipt = `DRV_${driverIdShort}_${timestamp}`;
     
     console.log('Generated receipt:', receipt, 'Length:', receipt.length);
 
@@ -73,13 +63,7 @@ export async function POST(request) {
     const options = {
       amount: amountInPaise,
       currency: 'INR',
-      receipt: receipt,
-      notes: {
-        carId: carId,
-        userId: userId,
-        driverId: bookingDetails.driverId || 'none',
-        totalDays: bookingDetails.totalDays,
-      },
+      receipt: receipt, // Now guaranteed to be under 40 chars
     };
 
     console.log('Creating order with options:', options);

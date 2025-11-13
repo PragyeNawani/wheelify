@@ -36,6 +36,12 @@ export default function Navbar() {
             >
               Drivers
             </Link>
+            <Link
+              href="/admin/dashboard"
+              className="text-gray-700 hover:text-blue-600 transition"
+            >
+              Dashboard
+            </Link>
             {status === 'authenticated' ? (
               <>
                 <Link

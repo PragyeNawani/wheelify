@@ -3,9 +3,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({
     totalCars: 0,
@@ -14,14 +16,47 @@ export default function AdminDashboard() {
     totalRevenue: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [isVerifyingAdmin, setIsVerifyingAdmin] = useState(true);
+
+  // Verify admin access
+  useEffect(() => {
+    const verifyAdmin = async () => {
+      if (status === 'loading') return;
+      
+      if (status === 'unauthenticated') {
+        router.push('/auth/signin?callbackUrl=/admin/dashboard');
+        return;
+      }
+
+      if (status === 'authenticated') {
+        try {
+          // Verify admin status with backend
+          const res = await fetch('/api/admin/verify');
+          if (!res.ok) {
+            router.push('/unauthorized');
+            return;
+          }
+          setIsVerifyingAdmin(false);
+        } catch (error) {
+          console.error('Error verifying admin:', error);
+          router.push('/unauthorized');
+        }
+      }
+    };
+
+    verifyAdmin();
+  }, [status, router]);
 
   useEffect(() => {
-    fetchDashboardStats();
-  }, []);
+    if (!isVerifyingAdmin) {
+      fetchDashboardStats();
+    }
+  }, [isVerifyingAdmin]);
   
   const fetchDashboardStats = async () => {
     try {
       const res = await fetch('/api/admin/stats');
+      if (!res.ok) throw new Error('Failed to fetch stats');
       const data = await res.json();
       setStats(data);
     } catch (error) {
@@ -31,11 +66,21 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    // Remove localStorage usage - handle logout appropriately for your auth system
-    // For example, call your logout API endpoint
-    router.push('/admin/login');
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/' });
   };
+
+  // Show loading while verifying
+  if (status === 'loading' || isVerifyingAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verifying admin access...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -43,13 +88,18 @@ export default function AdminDashboard() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-            {/* <button
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Logged in as: {session?.user?.email}
+              </p>
+            </div>
+            <button
               onClick={handleLogout}
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition"
             >
               Logout
-            </button> */}
+            </button>
           </div>
         </div>
       </header>
@@ -178,6 +228,9 @@ function OverviewTab() {
     </div>
   );
 }
+
+// Include all the other component functions (CarsTab, CarForm, DriversTab, DriverForm, BookingsTab)
+// These remain the same as in your original file...
 
 function CarsTab() {
   const [cars, setCars] = useState([]);
@@ -310,6 +363,7 @@ function CarForm({ car, onClose }) {
     location: car?.location || '',
     description: car?.description || '',
     features: car?.features?.join(', ') || '',
+    images: car?.images || '',
     available: car?.available !== undefined ? car.available : true,
   });
 

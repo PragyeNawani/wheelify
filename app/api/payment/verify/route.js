@@ -59,8 +59,8 @@ export async function POST(request) {
     let rollbackNeeded = false;
 
     try {
-      // Step 1: Create car booking
-      console.log('Creating car booking...');
+      // Step 1: Create car booking with insurance details
+      console.log('Creating car booking with insurance...');
       carBooking = await Booking.create({
         user: userId,
         car: carId,
@@ -70,6 +70,16 @@ export async function POST(request) {
         totalPrice: bookingDetails.totalPrice,
         pickupLocation: bookingDetails.pickupLocation,
         dropoffLocation: bookingDetails.dropoffLocation,
+        // Insurance fields
+        insuranceAmount: bookingDetails.insuranceAmount || 0,
+        insuranceAccepted: bookingDetails.insuranceAccepted || false,
+        insuranceRefunded: false,
+        insuranceRefundDate: null,
+        insuranceRefundAmount: 0,
+        damageReported: false,
+        damageDescription: '',
+        damageAmount: 0,
+        // Payment fields
         status: 'confirmed',
         paymentStatus: 'paid',
         razorpayOrderId: razorpay_order_id,
@@ -78,6 +88,7 @@ export async function POST(request) {
       });
 
       console.log('Car booking created:', carBooking._id);
+      console.log('Insurance amount:', bookingDetails.insuranceAmount);
 
       // Step 2: Update car availability
       console.log('Updating car availability...');
@@ -143,6 +154,8 @@ export async function POST(request) {
           _id: carBooking._id,
           status: carBooking.status,
           paymentStatus: carBooking.paymentStatus,
+          insuranceAmount: carBooking.insuranceAmount,
+          insuranceAccepted: carBooking.insuranceAccepted,
         },
         driverBooking: driverBooking ? {
           _id: driverBooking._id,

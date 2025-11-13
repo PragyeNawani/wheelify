@@ -2,10 +2,11 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import DriverBooking from '@/models/DriverBooking';
-
+import { requireAdmin } from '@/lib/adminAuth';
 // GET - Get all driver bookings
 export async function GET(request) {
   try {
+    await requireAdmin();
     await dbConnect();
     
     // Get query parameters for filtering
@@ -40,6 +41,7 @@ export async function GET(request) {
 // POST - Create new driver booking (admin can create bookings)
 export async function POST(request) {
   try {
+    await requireAdmin();
     await dbConnect();
     const body = await request.json();
     

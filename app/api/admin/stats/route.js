@@ -5,9 +5,10 @@ import Car from '@/models/Car';
 import Driver from '@/models/Driver';
 import Booking from '@/models/Booking';
 import DriverBooking from '@/models/DriverBooking';
-
+import { requireAdmin } from '@/lib/adminAuth';
 export async function GET(request) {
   try {
+    await requireAdmin();
     await connectDB();
 
     // Get counts

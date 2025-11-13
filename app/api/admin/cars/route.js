@@ -2,10 +2,11 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Car from '@/models/Car';
-
+import { requireAdmin } from '@/lib/adminAuth';
 // GET all cars
 export async function GET() {
   try {
+    await requireAdmin();
     await dbConnect();
     const cars = await Car.find({}).sort({ createdAt: -1 });
     return NextResponse.json(cars);
@@ -21,6 +22,7 @@ export async function GET() {
 // POST new car
 export async function POST(request) {
   try {
+    await requireAdmin();
     await dbConnect();
     const body = await request.json();
     

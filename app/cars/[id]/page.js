@@ -158,6 +158,73 @@ export default function CarDetailsPage() {
             </div>
           </div>
 
+          {/* Security Deposit Information Section */}
+          {session && car.available && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-lg p-6 mb-6 border-2 border-blue-200">
+              <div className="flex items-start gap-4">
+                <div className="bg-blue-600 rounded-full p-3 flex-shrink-0">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-gray-900 mb-3">Security Deposit (Mandatory)</h2>
+                  <p className="text-gray-700 mb-4">
+                    A refundable security deposit is required for all bookings to protect against potential damages.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="flex items-start gap-3 bg-white rounded-lg p-3">
+                      <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm">Fully Refundable</p>
+                        <p className="text-xs text-gray-600">After vehicle inspection</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3 bg-white rounded-lg p-3">
+                      <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm">One-Time Fee</p>
+                        <p className="text-xs text-gray-600">10% of total booking</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3 bg-white rounded-lg p-3">
+                      <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm">Damage Coverage</p>
+                        <p className="text-xs text-gray-600">Protects against accidental damage</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3 bg-white rounded-lg p-3">
+                      <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm">Quick Refund</p>
+                        <p className="text-xs text-gray-600">Within 7 business days</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-100 border-l-4 border-blue-600 p-3 rounded">
+                    <p className="text-sm text-blue-900">
+                      <span className="font-semibold">Important:</span> The security deposit will be calculated automatically at 10% of your total booking amount (including driver if selected). You must accept this before proceeding to payment.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Add Driver Section */}
           {session && car.available && (
             <div className="bg-white rounded-lg shadow-lg p-6 mb-6">

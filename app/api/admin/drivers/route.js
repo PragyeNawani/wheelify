@@ -2,10 +2,11 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Driver from '@/models/Driver';
-
+import { requireAdmin } from '@/lib/adminAuth';
 // GET - Get all drivers
 export async function GET() {
   try {
+    await requireAdmin();
     await dbConnect();
     
     const drivers = await Driver.find({})
@@ -25,6 +26,7 @@ export async function GET() {
 // POST - Create new driver
 export async function POST(request) {
   try {
+    await requireAdmin();
     await dbConnect();
     const body = await request.json();
     
